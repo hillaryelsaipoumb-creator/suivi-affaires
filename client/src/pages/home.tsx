@@ -1,97 +1,161 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-interface Affaire {
-  id: number;
-  reference: string;
-  client: string;
-  description: string;
-  statut: string;
-  dateCreation: string;
-  dateEcheance?: string;
-}
+type Ligne = {
+  collegue: string;
+  specialite: string;
+  affaire: string;
+  libelle: string;
+};
+
+const DATA: Ligne[] = [
+  { collegue: "Rachid (AIT SAID)", specialite: "MECA", affaire: "PNPP2601", libelle: "Optimisation du renforcement DVN" },
+  { collegue: "Rachid (AIT SAID)", specialite: "MECA", affaire: "PNPE2579", libelle: "Traitement du risque de fluite aux singularit\u00e9s sur RHY" },
+  { collegue: "Rachid (AIT SAID)", specialite: "MECA", affaire: "PNPE2483", libelle: "ASG" },
+  { collegue: "Rachid (AIT SAID)", specialite: "MECA", affaire: "PNPE2538", libelle: "Dispositions issues des \u00e9tudes thermiques grand chaud des locaux des pompes RCV" },
+  { collegue: "Cardenel Sognon / Xavier GROSJEAN", specialite: "ELEC", affaire: "PNPE2141", libelle: "PNPE2141" },
+  { collegue: "Cardenel Sognon / Xavier GROSJEAN", specialite: "ELEC", affaire: "PNPE2258A-A", libelle: "Disposition SEG (r\u00e9alimentation de la b\u00e2che ASG et appoint en eau \u00e0 la piscine BK ainsi qu\u2019\u00e0 la piscine BR en situations ND) - P4 - SEG Partie Ilot Nucl\u00e9aire" },
+  { collegue: "ARCADIA (Lahcen / LAKMOUCHI)", specialite: "MECA", affaire: "PNPE2360AA", libelle: "Maitrise du risque Hydrazine secondaire" },
+  { collegue: "Sylver (NGATCHA)", specialite: "ELEC", affaire: "PNPE2567", libelle: "Modification CC skids air de d\u00e9marrage DUS" },
+  { collegue: "Sylver (NGATCHA)", specialite: "ELEC", affaire: "PNPE2568AA", libelle: "Traitement des cases compresseur DUV" },
+  { collegue: "Arnaud (ROTT)", specialite: "ELEC", affaire: "PNPE2552", libelle: "Liaison souterraine SGR" },
+  { collegue: "Rafa\u00ebl LEMMONIER", specialite: "ELEC", affaire: "PNPE2360AA", libelle: "Maitrise du risque Hydrazine secondaire" },
+  { collegue: "Rafa\u00ebl LEMMONIER", specialite: "ELEC", affaire: "PNPE2258A-A", libelle: "Disposition SEG (r\u00e9alimentation de la b\u00e2che ASG et appoint en eau \u00e0 la piscine BK ainsi qu\u2019\u00e0 la piscine BR en situations ND) - P4 - SEG Partie Ilot Nucl\u00e9aire" },
+  { collegue: "Christophe & Omer (ROUSSEL / AYDOGDU)", specialite: "ELEC", affaire: "PNPE2431A-A", libelle: "Remplacement des coffrets survitesse TPS ASG" },
+  { collegue: "Christophe & Omer (ROUSSEL / AYDOGDU)", specialite: "ELEC", affaire: "PNPE2354BA", libelle: "Pr\u00e9l\u00e8vement des Armoires de CC LHP/Q + relais Auto et Protection - Tome B - Pr\u00e9l\u00e8vement des r\u00e9gulateurs" },
+  { collegue: "Christophe & Omer (ROUSSEL / AYDOGDU)", specialite: "ELEC", affaire: "PNPE2489A-A", libelle: "Dossier d\u2019assurance poste MQ" },
+  { collegue: "Ahmed & Dris (DJELAILI / FILAHY)", specialite: "ELEC", affaire: "PNPE2619A-A", libelle: "Maintien de Qualification des Trappes DVH" },
+  { collegue: "Ahmed & Dris (DJELAILI / FILAHY)", specialite: "ELEC", affaire: "PNPE2538", libelle: "Dispositions issues des \u00e9tudes thermiques grand chaud des locaux des pompes RCV" },
+  { collegue: "Ahmed & Dris (DJELAILI / FILAHY)", specialite: "ELEC", affaire: "PNPE2617", libelle: "Remplacement connecteurs sur SME P4" },
+  { collegue: "J\u00e9r\u00f4me (OKOBO)", specialite: "ELEC", affaire: "PNPE2483", libelle: "Disposition ASG ND (alimentation en eau des GV)" },
+  { collegue: "J\u00e9r\u00f4me (OKOBO)", specialite: "ELEC", affaire: "PNPE2488", libelle: "Dossier d\u2019assurance remplacement des T140" },
+  { collegue: "Matthieu (Blondel) / Axel LE LANCHON", specialite: "ELEC", affaire: "PNPE2976", libelle: "Corrium" },
+  { collegue: "Matthieu (Blondel) / Axel LE LANCHON", specialite: "MECA", affaire: "PNPE2374", libelle: "Remplacement TF" },
+  { collegue: "Matthieu (Blondel) / Axel LE LANCHON", specialite: "ELEC", affaire: "PNPE2490", libelle: "Modification des VG" },
+];
+
+const SPECIALITES = ["Toutes", "MECA", "ELEC"];
 
 export default function HomePage() {
-  const qc = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ reference: "", client: "", description: "", statut: "En cours", dateCreation: new Date().toISOString().split("T")[0], dateEcheance: "" });
+  const [filtre, setFiltre] = useState("Toutes");
+  const [recherche, setRecherche] = useState("");
 
-  const { data: affaires = [], isLoading } = useQuery<Affaire[]>({
-    queryKey: ["/api/affaires"],
+  const lignesFiltrees = DATA.filter((l) => {
+    const matchSpec = filtre === "Toutes" || l.specialite === filtre;
+    const q = recherche.toLowerCase();
+    const matchSearch =
+      q === "" ||
+      l.collegue.toLowerCase().includes(q) ||
+      l.affaire.toLowerCase().includes(q) ||
+      l.libelle.toLowerCase().includes(q);
+    return matchSpec && matchSearch;
   });
 
-  const createMutation = useMutation({
-    mutationFn: async (data: Omit<Affaire, "id">) => {
-      const res = await fetch("/api/affaires", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
-      return res.json();
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/affaires"] }); setShowForm(false); },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => { await fetch(`/api/affaires/${id}`, { method: "DELETE" }); },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/affaires"] }),
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate(form as Omit<Affaire, "id">);
+  const th: React.CSSProperties = {
+    padding: "11px 14px",
+    textAlign: "left",
+    border: "1px solid #cbd5e1",
+    background: "#1e3a5f",
+    color: "#fff",
+    fontWeight: 700,
+    fontSize: 13,
+    whiteSpace: "nowrap",
   };
 
+  const tdBase: React.CSSProperties = {
+    padding: "10px 14px",
+    border: "1px solid #e2e8f0",
+    fontSize: 13,
+    verticalAlign: "middle",
+  };
+
+  const badgeSpec = (s: string): React.CSSProperties => ({
+    display: "inline-block",
+    padding: "3px 10px",
+    borderRadius: 12,
+    fontWeight: 700,
+    fontSize: 12,
+    background: s === "MECA" ? "#fef3c7" : "#dbeafe",
+    color: s === "MECA" ? "#92400e" : "#1e40af",
+  });
+
   return (
-    <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "20px", fontFamily: "sans-serif" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-        <h1 style={{ fontSize: "28px", fontWeight: "bold", margin: 0 }}>Suivi des Affaires</h1>
-        <button onClick={() => setShowForm(!showForm)} style={{ background: "#2563eb", color: "white", border: "none", padding: "10px 20px", borderRadius: "6px", cursor: "pointer", fontSize: "16px" }}>
-          {showForm ? "Annuler" : "+ Nouvelle Affaire"}
-        </button>
+    <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "'Segoe UI', Arial, sans-serif" }}>
+      {/* HEADER */}
+      <div style={{ background: "#1e3a5f", padding: "24px 32px 20px", boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#3b82f6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>\ud83d\udcc1</div>
+          <div>
+            <h1 style={{ margin: 0, color: "#fff", fontSize: 24, fontWeight: 800, letterSpacing: 0.5 }}>Suivi des Affaires</h1>
+            <p style={{ margin: 0, color: "#93c5fd", fontSize: 13 }}>Tableau de bord collaborateurs</p>
+          </div>
+        </div>
       </div>
 
-      {showForm && (
-        <form onSubmit={handleSubmit} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "20px", marginBottom: "24px" }}>
-          <h2 style={{ marginTop: 0 }}>Nouvelle Affaire</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-            <div><label>Référence *</label><br/><input required value={form.reference} onChange={e => setForm({...form, reference: e.target.value})} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "4px", marginTop: "4px" }} /></div>
-            <div><label>Client *</label><br/><input required value={form.client} onChange={e => setForm({...form, client: e.target.value})} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "4px", marginTop: "4px" }} /></div>
-            <div style={{ gridColumn: "1/-1" }}><label>Description</label><br/><textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "4px", marginTop: "4px", minHeight: "80px" }} /></div>
-            <div><label>Statut</label><br/><select value={form.statut} onChange={e => setForm({...form, statut: e.target.value})} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "4px", marginTop: "4px" }}><option>En cours</option><option>En attente</option><option>Terminé</option><option>Annulé</option></select></div>
-            <div><label>Date d'échéance</label><br/><input type="date" value={form.dateEcheance} onChange={e => setForm({...form, dateEcheance: e.target.value})} style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "4px", marginTop: "4px" }} /></div>
-          </div>
-          <button type="submit" style={{ marginTop: "16px", background: "#16a34a", color: "white", border: "none", padding: "10px 24px", borderRadius: "6px", cursor: "pointer", fontSize: "16px" }}>Enregistrer</button>
-        </form>
-      )}
-
-      {isLoading ? (
-        <p>Chargement...</p>
-      ) : affaires.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "48px", color: "#64748b" }}>
-          <p style={{ fontSize: "18px" }}>Aucune affaire pour le moment</p>
-          <p>Cliquez sur "+ Nouvelle Affaire" pour commencer</p>
+      <div style={{ padding: "28px 32px" }}>
+        {/* STATS */}
+        <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+          {[
+            { label: "Total lignes", val: DATA.length, color: "#3b82f6" },
+            { label: "MECA", val: DATA.filter(d => d.specialite === "MECA").length, color: "#f59e0b" },
+            { label: "ELEC", val: DATA.filter(d => d.specialite === "ELEC").length, color: "#6366f1" },
+            { label: "Collaborateurs", val: [...new Set(DATA.map(d => d.collegue))].length, color: "#10b981" },
+          ].map(s => (
+            <div key={s.label} style={{ background: "#fff", borderRadius: 10, padding: "14px 22px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", borderTop: `3px solid ${s.color}`, minWidth: 130 }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color: s.color }}>{s.val}</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{s.label}</div>
+            </div>
+          ))}
         </div>
-      ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr style={{ background: "#f1f5f9" }}>
-              <th style={{ padding: "12px", textAlign: "left", border: "1px solid #e2e8f0" }}>Référence</th>
-              <th style={{ padding: "12px", textAlign: "left", border: "1px solid #e2e8f0" }}>Client</th>
-              <th style={{ padding: "12px", textAlign: "left", border: "1px solid #e2e8f0" }}>Description</th>
-              <th style={{ padding: "12px", textAlign: "left", border: "1px solid #e2e8f0" }}>Statut</th>
-              <th style={{ padding: "12px", textAlign: "left", border: "1px solid #e2e8f0" }}>Date création</th>
-              <th style={{ padding: "12px", textAlign: "left", border: "1px solid #e2e8f0" }}>Actions</th>
-            </tr></thead>
-            <tbody>{affaires.map(a => (
-              <tr key={a.id} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                <td style={{ padding: "12px", border: "1px solid #e2e8f0", fontWeight: "600" }}>{a.reference}</td>
-                <td style={{ padding: "12px", border: "1px solid #e2e8f0" }}>{a.client}</td>
-                <td style={{ padding: "12px", border: "1px solid #e2e8f0" }}>{a.description}</td>
-                <td style={{ padding: "12px", border: "1px solid #e2e8f0" }}><span style={{ padding: "4px 8px", borderRadius: "4px", background: a.statut === "Terminé" ? "#dcfce7" : a.statut === "En cours" ? "#dbeafe" : a.statut === "Annulé" ? "#fee2e2" : "#fef3c7", fontSize: "13px" }}>{a.statut}</span></td>
-                <td style={{ padding: "12px", border: "1px solid #e2e8f0" }}>{a.dateCreation}</td>
-                <td style={{ padding: "12px", border: "1px solid #e2e8f0" }}><button onClick={() => deleteMutation.mutate(a.id)} style={{ background: "#ef4444", color: "white", border: "none", padding: "6px 12px", borderRadius: "4px", cursor: "pointer" }}>Supprimer</button></td>
+
+        {/* FILTRES */}
+        <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            placeholder="\ud83d\udd0d Rechercher (coll\u00e8gue, affaire, libell\u00e9)..."
+            value={recherche}
+            onChange={e => setRecherche(e.target.value)}
+            style={{ padding: "9px 14px", border: "1px solid #cbd5e1", borderRadius: 7, fontSize: 13, width: 320, outline: "none" }}
+          />
+          {SPECIALITES.map(s => (
+            <button
+              key={s}
+              onClick={() => setFiltre(s)}
+              style={{
+                padding: "9px 18px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                background: filtre === s ? "#1e3a5f" : "#e2e8f0",
+                color: filtre === s ? "#fff" : "#475569",
+              }}
+            >{s}</button>
+          ))}
+          <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>{lignesFiltrees.length} ligne(s) affich\u00e9e(s)</span>
+        </div>
+
+        {/* TABLEAU */}
+        <div style={{ overflowX: "auto", borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
+            <thead>
+              <tr>
+                <th style={th}>Coll\u00e8gue</th>
+                <th style={th}>Sp\u00e9cialit\u00e9</th>
+                <th style={th}>Affaire</th>
+                <th style={th}>Libell\u00e9 affaire</th>
               </tr>
-            ))}</tbody>
+            </thead>
+            <tbody>
+              {lignesFiltrees.map((l, i) => (
+                <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#f8fafc" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "#eff6ff")}
+                  onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#f8fafc")}
+                >
+                  <td style={{ ...tdBase, fontWeight: 600, color: "#1e3a5f" }}>{l.collegue}</td>
+                  <td style={{ ...tdBase, textAlign: "center" }}><span style={badgeSpec(l.specialite)}>{l.specialite}</span></td>
+                  <td style={{ ...tdBase, fontFamily: "monospace", fontWeight: 700, color: "#0f4c81" }}>{l.affaire}</td>
+                  <td style={{ ...tdBase, color: "#334155" }}>{l.libelle}</td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
-      )}
+      </div>
     </div>
   );
 }
